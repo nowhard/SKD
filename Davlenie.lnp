@@ -1,0 +1,6 @@
+"START_AD.obj",
+"Davlenie.obj",
+"f_read.obj",
+"f_write.obj" 
+TO "Davlenie" REGFILE (.\Davlenie.ORC) 
+RAMSIZE(256) 
