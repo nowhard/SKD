@@ -8,20 +8,15 @@
 
 #define DEBUG  0
 
-#define kof_dav 12.0
+#define kof_dav 1000.0
 #define kol_izmer 3
-#define kol_izmer_yar 1
+#define kol_izmer_yar 1				
 #define delay_led 2
-#define tochka_max 6.001 //300.999 - поставить если датчик на 600, 500.999 - поставить если датчик на 1000 
+#define tochka_max 500.999 //300.999 - поставить если датчик на 600, 500.999 - поставить если датчик на 1000 
 
 unsigned char idata str[20]={0};	  
 volatile float adc_float=0;	// long
 volatile float adc_float1=0;
-
-#if DEBUG==1
-volatile float debug_adc_float=0;
-#endif	
-
 float xdata interval=0;
 unsigned char adc_gotov=0;
 float xdata verhniy_pridel=1.200;
@@ -33,7 +28,11 @@ const float ves_raz=0.00000015258790881489620386316822328189;// 0.320 - 0.000000
 volatile long adc=0;
 volatile long adc2=0;
 unsigned int data kol_byte=0; // количество выводимых символов
+long nagruzka=0;
 unsigned char  yar=0;
+bit lcd_out=1;
+bit verh=0;
+bit niz=0;
 char yar_gotov=0;
 
 void delay(int length);
@@ -219,11 +218,11 @@ for(kol_pered=5;kol_pered>0;kol_pered--)  // выводим п€ть знакомест
      }
     if(tocka==1)
      {
-     init[1]=(out[kol-1]&0x0F)|0x80;// - вывод с точкой
-     tocka=0;	// - вывод с точкой
+     init[1]=(out[kol-1]&0x0F);//|0x80; - вывод с точкой
+     //tocka=0;	 - вывод с точкой
      }
     else
-     init[1]=out[kol-1]&0x0F; //- вывод чисел после точки
+     init[1]=0x0F;//out[kol-1]&0x0F; - вывод чисел после точки
    }
   for(kol_byt=0;kol_byt<2;kol_byt++)  	  // вывод двух байтных данных
    {
@@ -270,9 +269,8 @@ CS=1;
 //------------------------------
 void main (void)
 {
-unsigned char i=0;
-bit mig_mig=1;
-bit start_mig=0;
+unsigned int w=15;
+//unsigned char sbros=0;
 char len=0;
 
 #if DEBUG==1
@@ -290,9 +288,9 @@ flash_read (&verhniy_pridel,sizeof(verhniy_pridel),0x00000000);
 flash_read (&nijniy_pridel,sizeof(nijniy_pridel),0x00000004);
 
 if(_chkfloat_(verhniy_pridel)==4)
-verhniy_pridel=0.1502;
+verhniy_pridel=0.2602;
 if(_chkfloat_(nijniy_pridel)==4)
-nijniy_pridel=-0.0025;	 // -0.0022
+nijniy_pridel=-0.0022;	 // -0.0022
 
 interval=verhniy_pridel-nijniy_pridel;
 koef_usileniya_dav=kof_dav/interval;
@@ -324,22 +322,16 @@ while(1)
 	yar_gotov=0;
     yars[0]=0x0A;
     yars[1]=yar;
-
-	if(!start_mig)
-      LED_OUT(NULL,NULL,1,yars); // €ркость
-	}
-	 
+    LED_OUT(NULL,NULL,1,yars); // €ркость
+	} 
 if(adc_gotov==kol_izmer)
  {    
+  //lcd_out=0;
   adc_float1=(float)((float)(adc_float/(float)(kol_izmer))*ves_raz);	//adc_float1=adc_float;
-
-  #if DEBUG==1
-   debug_adc_float=adc_float1;
-  #endif
 
   if(INT1==0)
    {
-   interval=((adc_float1-nijniy_pridel)/tochka_max)*12;
+   interval=((adc_float1-nijniy_pridel)/tochka_max)*kof_dav;
    verhniy_pridel=interval+nijniy_pridel;
    //verhniy_pridel-=0.000000076293954407448101931584111640943;
    koef_usileniya_dav=kof_dav/interval;
@@ -356,49 +348,33 @@ if(adc_gotov==kol_izmer)
 
   adc_float=0;
   adc_gotov=0;
+ // lcd_out=1;
+
+
+  davlenie=((interval-(verhniy_pridel-adc_float1))*koef_usileniya_dav);
+  if(davlenie<0)
+  davlenie=0;
+  if(davlenie>=999) // поставить 600 если датчик на 600, или 999 если датчик на 1000
+  davlenie=999;
+
+  perevod_FloatToString(davlenie,str,1);
 
 LED_OUT(NULL,NULL,1,"\x09\xFF"); // инициализаци€ decode-on
 LED_OUT(NULL,NULL,1,"\x0B\x04"); // сканирование 5
 LED_OUT(NULL,NULL,1,"\x0C\x01"); // включение питани€
-
-davlenie=((interval-(verhniy_pridel-adc_float1))*koef_usileniya_dav);
-
-if(davlenie<0)
-  davlenie=0;
-
-if(davlenie>=12) // поставить 12 если датчик на 12, поставить 600 если датчик на 600, или 1000 если датчик на 1000
-{
-  davlenie=12.00;
-  start_mig=1;
-  mig_mig^=1;
-}
-else
-{
-  start_mig=0;
-  mig_mig=1;
-}
-
-perevod_FloatToString(davlenie,str,2);
 len=strlench(str);
-
+//yar=0x0F;
 yars[0]=0x0A;
-
-yars[1]=start_mig?0x0F:yar;
-
-if(start_mig && mig_mig)
-  for(i=0;i<len;i++)
-    str[i]=0x0F; // гасим все работающие индикаторы
-
+yars[1]=yar;
 LED_OUT(NULL,NULL,1,yars); // €ркость
 LED_OUT(str,len,0,NULL);
-
 
 #if DEBUG==1
 it0=INT0;
 it1=INT1;
 
-printf("\r%.3f  %.2f  %d  ",debug_adc_float,davlenie,(int)yar);
-printf("%d   %d   %lx           ",it0,it1,adc2);
+printf("\r%.1f  %d  %d   %d   %lx    ",davlenie,(int)yar,it0,it1,adc2);
+//printf("%.3d",(int)davlenie);
 #endif	 
   
   }	 
